@@ -36,6 +36,9 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 TupleType, lookup_casstype)
 from cassandra.policies import WriteType
 
+from cassandra.ext.llfastuuid import LLFastUUID
+
+
 log = logging.getLogger(__name__)
 
 
@@ -564,6 +567,9 @@ class ResultMessage(_MessageType):
             results = cls.recv_results_schema_change(f, protocol_version)
         return cls(kind, results, paging_state)
 
+
+    # This is nice, compact, but slow
+    '''
     @classmethod
     def recv_results_rows(cls, f, protocol_version, user_type_map):
         paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
@@ -575,6 +581,50 @@ class ResultMessage(_MessageType):
             tuple(ctype.from_binary(val, protocol_version)
                   for ctype, val in zip(coltypes, row))
             for row in rows]
+        return (paging_state, (colnames, parsed_rows))
+    '''
+
+    @classmethod
+    def recv_results_rows(cls, f, protocol_version, user_type_map):
+
+        paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
+
+        rows = []
+        cdef int rowcount = read_int(f)
+        for _ in range(rowcount):
+            row = cls.recv_row(f, len(column_metadata))
+            rows.append(row)
+        
+        colnames = []
+        coltypes = []
+        for c in column_metadata:
+            colnames.append(c[2])
+            coltypes.append(c[3])
+
+        parsed_rows = []
+        for row in rows:
+            parsed_row = []
+
+            # This is nice, compact, but slow
+            '''
+            for index in range(len(coltypes)):
+                t = coltypes[index]
+                v = row[index]
+                parsed_row.append(t.from_binary(v, protocol_version))
+            '''
+            
+            # This avoid the method lookup (expensive) if we know we are dealing with LLKGB
+            if coltypes[0] == BytesType and coltypes[1] == TimeUUIDType:
+                parsed_row.append(row[0])
+                parsed_row.append(LLFastUUID(row[1]))             
+            else: 
+                for index in range(len(coltypes)):
+                    t = coltypes[index]
+                    v = row[index]
+                    parsed_row.append(t.from_binary(v, protocol_version))
+            
+            parsed_rows.append(parsed_row)
+
         return (paging_state, (colnames, parsed_rows))
 
     @classmethod

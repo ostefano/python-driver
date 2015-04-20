@@ -54,7 +54,9 @@ else:
     def varint_unpack(term):  # noqa
         val = int(term.encode('hex'), 16)
         if (ord(term[0]) & 128) != 0:
-            val = val - (1 << (len(term) * 8))
+            # This fix a bug in cython (prevents overflow)
+            len_term = len(term)           
+            val = val - (1 << (len_term * 8))
         return val
 
 

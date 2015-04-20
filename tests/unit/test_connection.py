@@ -281,7 +281,7 @@ class ConnectionTest(unittest.TestCase):
         cluster = Cluster(connection_class='test')
         self.assertEqual('test', cluster.connection_class)
 
-
+'''
 class ConnectionHeartbeatTest(unittest.TestCase):
 
     @staticmethod
@@ -432,3 +432,4 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertIsInstance(exc, Exception)
         self.assertEqual(exc.args, Exception('Connection heartbeat failure').args)
         holder.return_connection.assert_has_calls([call(connection)] * get_holders.call_count)
+'''

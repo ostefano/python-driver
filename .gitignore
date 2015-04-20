@@ -20,3 +20,14 @@ setuptools*.egg
 
 # OSX
 .DS_Store
+cassandra/connection.c
+cassandra/cqltypes.c
+cassandra/marshal.c
+cassandra/metadata.c
+cassandra/policies.c
+cassandra/pool.c
+cassandra/protocol.c
+cassandra/query.c
+cassandra/util.c
+cassandra/ext/llfastuuid.c
+

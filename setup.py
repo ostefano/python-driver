@@ -35,6 +35,7 @@ from distutils.errors import (CCompilerError, DistutilsPlatformError,
                               DistutilsExecError)
 from distutils.cmd import Command
 
+from Cython.Build import cythonize
 
 import os
 import warnings
@@ -94,6 +95,18 @@ class DocCommand(Command):
                 pass
 
         if has_subprocess:
+
+            # We also build in place so to have sphinx-doc succeed with cythonized files
+            # without changing anything
+            try:
+                output = subprocess.check_output(
+                    ["python", "setup.py", "build_ext", "--inplace"],
+                    stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("Documentation step '%s' failed: %s: %s" % ("build_ext", exc, exc.output))
+            else:
+                print(output)
+
             try:
                 output = subprocess.check_output(
                     ["sphinx-build", "-b", mode, "docs", path],
@@ -123,6 +136,67 @@ libev_ext = Extension('cassandra.io.libevwrapper',
                       libraries=['ev'],
                       library_dirs=['/usr/local/lib', '/opt/local/lib'])
 
+llfastuuid_ext = cythonize([
+    Extension(
+        "cassandra.ext.llfastuuid", 
+        ["cassandra/ext/llfastuuid.pyx"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+])
+
+''' 
+Note the magic.
+Python loads .so first, so we can lazily leave the files 
+with extension py instead of pyx so to easily merge further 
+revisions
+'''
+cythonized_modules = cythonize([
+    Extension(
+        "cassandra.protocol", 
+        ["cassandra/protocol.pyx"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ), 
+    Extension(
+        "cassandra.cqltypes", 
+        ["cassandra/cqltypes.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.connection", 
+        ["cassandra/connection.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.policies", 
+        ["cassandra/policies.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.pool", 
+        ["cassandra/pool.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.query", 
+        ["cassandra/query.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.util", 
+        ["cassandra/util.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.marshal", 
+        ["cassandra/marshal.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+    Extension(
+        "cassandra.metadata", 
+        ["cassandra/metadata.py"],
+        extra_compile_args = ['-Wno-unused-function', '-Wunused-but-set-variable'],
+    ),
+])
 
 class build_extensions(build_ext):
 
@@ -205,7 +279,7 @@ def run_setup(extensions):
         url='http://github.com/datastax/python-driver',
         author='Tyler Hobbs',
         author_email='tyler@datastax.com',
-        packages=['cassandra', 'cassandra.io'],
+        packages=['cassandra', 'cassandra.io', 'cassandra.ext'],
         include_package_data=True,
         install_requires=dependencies,
         tests_require=['nose', 'mock', 'PyYAML', 'pytz'],
@@ -227,6 +301,7 @@ def run_setup(extensions):
         **kw)
 
 extensions = [murmur3_ext, libev_ext]
+extensions = extensions + llfastuuid_ext + cythonized_modules
 if "--no-extensions" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-extensions"]
     extensions = []
@@ -236,7 +311,13 @@ elif "--no-murmur3" in sys.argv:
 elif "--no-libev" in sys.argv:
     sys.argv = [a for a in sys.argv if a != "--no-libev"]
     extensions.remove(libev_ext)
-
+elif "--no-llfastuuid" in sys.argv:
+    sys.argv = [a for a in sys.argv if a != "--no-llfastuuid"]
+    extensions.remove(llfastuuid_ext[0])
+elif "--no-cythonized" in sys.argv:
+    sys.argv = [a for a in sys.argv if a != "--no-cythonized"]
+    for module in cythonized_modules:
+        extensions.remove(module)
 
 platform_unsupported_msg = \
 """

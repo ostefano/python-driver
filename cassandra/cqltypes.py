@@ -49,6 +49,8 @@ from cassandra.marshal import (int8_pack, int8_unpack, uint16_pack, uint16_unpac
                                varint_pack, varint_unpack)
 from cassandra.util import OrderedMap, sortedset
 
+from cassandra.ext.llfastuuid import LLFastUUID
+
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
 
@@ -606,7 +608,8 @@ class TimeUUIDType(DateType):
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        return UUID(bytes=byts)
+        return LLFastUUID(bytes=byts)
+        # return UUID(bytes=byts)
 
     @staticmethod
     def serialize(timeuuid, protocol_version):
